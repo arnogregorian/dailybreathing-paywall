@@ -659,14 +659,14 @@ onMounted(async () => {
 }
 
 .package-price {
-  font-size: 1.65rem;
+  font-size: 1.75rem;
   font-weight: 700;
   line-height: 1.2;
   color: white;
 }
 
 .package-price-period {
-  font-size: 1rem;
+  font-size: 1.1rem;
   color: white;
   opacity: 0.9;
   margin-top: 0.25rem;
