@@ -695,12 +695,12 @@ onMounted(async () => {
   background: white;
   border: 1px solid #d1d5db;
   border-radius: 6px;
-  font-size: 1.2rem;
+  font-size: 1.4rem;
   margin-bottom: 0.75rem;
 }
 
 .form-input::placeholder {
-  font-size: 1.1rem;
+  font-size: 1.4rem;
 }
 
 .form-input:focus {
@@ -734,7 +734,7 @@ button.submit-btn {
   border-radius: 6px;
   padding: 1rem 1.5rem;
   cursor: pointer;
-  font-size: 1.05rem;
+  font-size: 1.4rem;
   font-weight: 600;
 }
 
