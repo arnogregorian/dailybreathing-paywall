@@ -783,6 +783,8 @@ h2 {
 
 .auth-link-text {
   color: white;
+  width: 100%;
+  text-align: center;
 }
 
 .error-message {
