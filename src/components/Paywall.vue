@@ -122,7 +122,7 @@ const purchasePackage = async (pkg) => {
       pkg.planType,
       currentUser.id,
       'https://daily-breathing.com/welcome/',
-      `${window.location.origin}/?checkout=cancel`
+      `${window.location.origin}${window.location.pathname || '/'}?checkout=cancel`
     )
     
     // Note: User will be redirected to Stripe Checkout, so we won't reach here

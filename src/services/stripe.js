@@ -68,7 +68,7 @@ class StripeService {
           planType: planType,
           userId: userId,
           successUrl: successUrl || 'https://daily-breathing.com/welcome/',
-          cancelUrl: cancelUrl || `${window.location.origin}/?checkout=cancel`
+          cancelUrl: cancelUrl || `${window.location.origin}${window.location.pathname || '/'}?checkout=cancel`
         }
       })
 

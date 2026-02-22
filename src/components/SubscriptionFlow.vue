@@ -181,16 +181,72 @@
         <div class="error-message">{{ error }}</div>
         <button @click="processPurchase" class="btn-retry">Try Again</button>
       </div>
-      <div v-else-if="!selectedPackage">
+      <div v-else-if="!selectedPackage" class="select-plan-block">
         <h2>Select a Plan</h2>
-        <p>Please select a subscription plan to continue.</p>
-        <button @click="user = null; showSignIn = false">Go Back</button>
+        <p>Choose a subscription plan to continue to checkout.</p>
+        <div class="packages-list">
+          <div
+            v-for="pkg in packages"
+            :key="pkg.identifier"
+            class="package-item"
+            :class="{
+              'selected': selectedPackageId === pkg.identifier,
+              'yearly': isAnnualPackage(pkg),
+              'monthly': isMonthlyPackage(pkg)
+            }"
+            @click="selectPackage(pkg)"
+          >
+            <div v-if="isAnnualPackage(pkg) && calculateSavingsPercentage()" class="package-badge">
+              SAVE {{ calculateSavingsPercentage() }}%
+            </div>
+            <div class="package-content">
+              <div class="package-left">
+                <h3 class="package-title">{{ isAnnualPackage(pkg) ? 'Yearly' : 'Monthly' }}</h3>
+                <div class="package-price-line">
+                  {{ formatPrice(pkg) }} {{ isMonthlyPackage(pkg) ? '/ month' : '/ year' }}
+                </div>
+              </div>
+              <div class="package-right">
+                <div class="package-price">Free</div>
+                <div class="package-price-period">for the first 7 days</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="checkout-actions">
+          <button
+            type="button"
+            class="btn-retry"
+            :disabled="!selectedPackage"
+            @click="processPurchase"
+          >
+            Continue to checkout
+          </button>
+          <button type="button" class="btn-back-to-start" @click="user = null; showSignIn = false">
+            Back to start (plan, name & email)
+          </button>
+        </div>
       </div>
-      <div v-else>
-        <h2>Preparing checkout...</h2>
-        <p>Please wait.</p>
+      <div v-else class="ready-checkout">
+        <h2>Ready to checkout</h2>
+        <p>Complete your subscription by continuing to secure checkout.</p>
+        <div class="checkout-actions">
+          <button type="button" @click="processPurchase" class="btn-retry">Continue to checkout</button>
+          <button type="button" class="btn-back-to-start" @click="user = null; showSignIn = false">
+            Back to start (plan, name & email)
+          </button>
+        </div>
       </div>
     </div>
+
+    <button
+      v-if="user"
+      type="button"
+      class="logout-btn"
+      @click="handleLogout"
+    >
+      Log out
+    </button>
   </div>
 </template>
 
@@ -253,6 +309,12 @@ const loadOfferings = async () => {
 const selectPackage = (pkg) => {
   selectedPackageId.value = pkg.identifier || pkg.id
   selectedPackage.value = pkg
+}
+
+const handleLogout = async () => {
+  await supabase.auth.signOut()
+  user.value = null
+  showSignIn.value = false
 }
 
 const generateStrongPassword = () => {
@@ -441,7 +503,7 @@ const processPurchase = async () => {
       selectedPackage.value.planType,
       user.value.id,
       'https://daily-breathing.com/welcome/',
-      `${window.location.origin}/?checkout=cancel`
+      `${window.location.origin}${window.location.pathname || '/'}?checkout=cancel`
     )
     
     // Note: User will be redirected to Stripe Checkout, so we won't reach here
@@ -561,9 +623,15 @@ onMounted(async () => {
       // Don't show error to user - they may have just completed checkout
     }
   } else if (urlParams.get('checkout') === 'cancel') {
-    // User cancelled checkout
+    // User cancelled checkout – reset to plan selection so they can try again
     purchasing.value = false
-    error.value = 'Checkout was cancelled. You can try again anytime.'
+    error.value = null
+    selectedPackageId.value = null
+    selectedPackage.value = null
+    // Clear URL so refresh doesn't re-trigger
+    if (window.history.replaceState) {
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+    }
   }
 })
 </script>
@@ -711,10 +779,23 @@ onMounted(async () => {
 .otp-form .otp-input {
   text-align: center;
   letter-spacing: 0.5em;
-  font-size: 1.5rem;
-  max-width: 12rem;
+  font-size: 2.25rem;
+  font-weight: 600;
+  max-width: 14rem;
   margin: 0 auto;
   display: block;
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  color: white;
+}
+
+.otp-form .otp-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.otp-form .otp-input:focus {
+  border-color: rgba(255, 255, 255, 0.9);
+  outline: none;
 }
 
 form {
@@ -778,6 +859,24 @@ h2 {
 
 .processing-message h2,
 .processing-message p {
+  color: white;
+}
+
+.ready-checkout {
+  text-align: center;
+}
+
+.ready-checkout h2,
+.ready-checkout p {
+  color: white;
+}
+
+.ready-checkout .btn-retry {
+  display: inline-block;
+}
+
+.select-plan-block h2,
+.select-plan-block p {
   color: white;
 }
 
@@ -861,5 +960,52 @@ h2 {
 
 .btn-retry:hover {
   background: #d63900;
+}
+
+.checkout-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.checkout-actions .btn-retry {
+  margin-top: 0;
+}
+
+.btn-back-to-start {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.btn-back-to-start:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.logout-btn {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.logout-btn:hover {
+  background: rgba(0, 0, 0, 0.4);
+  color: white;
 }
 </style>
