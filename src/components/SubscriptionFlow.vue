@@ -3,10 +3,15 @@
     <!-- Product Selection and Registration -->
     <div v-if="!user && !showSignIn">
       <h2>Choose Your Plan</h2>
-      
+
+      <div v-if="activePromo" class="promo-banner">
+        <span class="promo-tag">{{ activePromo.code }}</span>
+        <span class="promo-text">{{ activePromo.discountPercent }}% off applied automatically at checkout</span>
+      </div>
+
       <div v-if="error">
         {{ error }}
-        <button @click="loadOfferings">Retry</button>
+        <button type="button" class="btn-primary" @click="loadOfferings">Retry</button>
       </div>
 
       <div v-else-if="packages.length === 0 && !loading">
@@ -43,7 +48,14 @@
             <div class="package-left">
               <h3 class="package-title">{{ isAnnualPackage(pkg) ? 'Yearly' : 'Monthly' }}</h3>
               <div class="package-price-line">
-                {{ formatPrice(pkg) }} {{ isMonthlyPackage(pkg) ? '/ month' : '/ year' }}
+                <template v-if="activePromo">
+                  <span class="price-original">{{ formatPrice(pkg) }}</span>
+                  <span class="price-discounted">{{ formatDiscountedPrice(pkg) }}</span>
+                </template>
+                <template v-else>
+                  {{ formatPrice(pkg) }}
+                </template>
+                {{ isMonthlyPackage(pkg) ? '/ month' : '/ year' }}
               </div>
             </div>
             <div class="package-right">
@@ -94,7 +106,7 @@
             />
           </div>
 
-          <button type="submit" :disabled="registering || !selectedPackage">
+          <button type="submit" class="btn-primary" :disabled="registering || !selectedPackage">
             {{ registering ? 'Creating Account...' : 'Create Account & Start' }}
           </button>
           
@@ -114,29 +126,16 @@
         {{ authError }}
       </div>
 
-      <div v-if="otpSent" class="success-message">
+      <div v-if="otpSent" class="success-message otp-code-prompt">
         Check your email for your 6-digit code.
       </div>
 
       <form v-if="otpSent" @submit.prevent="handleVerifyOtp" class="otp-form">
-        <div>
-          <input
-            id="otp-code"
-            v-model="otpCode"
-            type="text"
-            inputmode="numeric"
-            pattern="[0-9]*"
-            maxlength="6"
-            placeholder="000000"
-            class="form-input otp-input"
-            autocomplete="one-time-code"
-            @input="otpCode = $event.target.value.replace(/\D/g, '').slice(0, 6)"
-          />
-        </div>
-        <button type="submit" :disabled="verifying || otpCode.length !== 6">
+        <OtpInput v-model="otpCode" />
+        <button type="submit" class="btn-primary" :disabled="verifying || otpCode.length !== 6">
           {{ verifying ? 'Verifying...' : 'Verify & manage subscription' }}
         </button>
-        <button type="button" class="link-button" @click="otpSent = false; otpCode = ''">Use a different email</button>
+        <button type="button" class="btn-secondary" @click="otpSent = false; otpCode = ''">Use a different email</button>
       </form>
 
       <form v-if="!otpSent" @submit.prevent="handleSignIn">
@@ -151,7 +150,7 @@
           />
         </div>
 
-        <button type="submit" :disabled="signingIn">
+        <button type="submit" class="btn-primary" :disabled="signingIn">
           {{ signingIn ? 'Sending...' : 'Send Sign-In Link' }}
         </button>
 
@@ -165,7 +164,7 @@
     <div v-if="user">
       <div v-if="purchasing" class="processing-message">
         <h2>Processing your subscription...</h2>
-        <p>Redirecting to secure checkout...</p>
+        <div class="spinner" aria-hidden="true"></div>
       </div>
       <div v-else-if="purchaseComplete">
         <h2>Welcome to Premium!</h2>
@@ -174,16 +173,20 @@
       <div v-else-if="authError">
         <h2>Almost there</h2>
         <div class="error-message">{{ authError }}</div>
-        <button @click="user = null; authError = null">Back to sign up</button>
+        <button type="button" class="btn-secondary" @click="user = null; authError = null">Back to sign up</button>
       </div>
       <div v-else-if="error">
         <h2>Error</h2>
         <div class="error-message">{{ error }}</div>
-        <button @click="processPurchase" class="btn-retry">Try Again</button>
+        <button type="button" class="btn-primary" @click="processPurchase">Try Again</button>
       </div>
-      <div v-else-if="!selectedPackage" class="select-plan-block">
+      <div v-else class="select-plan-block">
         <h2>Select a Plan</h2>
-        <p>Choose a subscription plan to continue to checkout.</p>
+        <div v-if="activePromo" class="promo-banner">
+          <span class="promo-tag">{{ activePromo.code }}</span>
+          <span class="promo-text">{{ activePromo.discountPercent }}% off applied automatically at checkout</span>
+        </div>
+        <p>Choose a subscription plan, then click the button below to go to checkout.</p>
         <div class="packages-list">
           <div
             v-for="pkg in packages"
@@ -203,7 +206,14 @@
               <div class="package-left">
                 <h3 class="package-title">{{ isAnnualPackage(pkg) ? 'Yearly' : 'Monthly' }}</h3>
                 <div class="package-price-line">
-                  {{ formatPrice(pkg) }} {{ isMonthlyPackage(pkg) ? '/ month' : '/ year' }}
+                  <template v-if="activePromo">
+                    <span class="price-original">{{ formatPrice(pkg) }}</span>
+                    <span class="price-discounted">{{ formatDiscountedPrice(pkg) }}</span>
+                  </template>
+                  <template v-else>
+                    {{ formatPrice(pkg) }}
+                  </template>
+                  {{ isMonthlyPackage(pkg) ? '/ month' : '/ year' }}
                 </div>
               </div>
               <div class="package-right">
@@ -216,23 +226,13 @@
         <div class="checkout-actions">
           <button
             type="button"
-            class="btn-retry"
+            class="btn-primary"
             :disabled="!selectedPackage"
             @click="processPurchase"
           >
             Continue to checkout
           </button>
-          <button type="button" class="btn-back-to-start" @click="user = null; showSignIn = false">
-            Back to start (plan, name & email)
-          </button>
-        </div>
-      </div>
-      <div v-else class="ready-checkout">
-        <h2>Ready to checkout</h2>
-        <p>Complete your subscription by continuing to secure checkout.</p>
-        <div class="checkout-actions">
-          <button type="button" @click="processPurchase" class="btn-retry">Continue to checkout</button>
-          <button type="button" class="btn-back-to-start" @click="user = null; showSignIn = false">
+          <button type="button" class="btn-secondary" @click="handleLogout">
             Back to start (plan, name & email)
           </button>
         </div>
@@ -252,8 +252,16 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import OtpInput from './OtpInput.vue'
 import stripeService from '../services/stripe.js'
 import supabase from '../services/supabase.js'
+
+// Active promotion — set to null to disable
+const activePromo = ref({
+  code: 'BREATHE20',
+  promotionCodeId: 'promo_1TBgbqBZoGV3errSU8HsruRV',
+  discountPercent: 20
+})
 
 const loading = ref(true)
 const error = ref(null)
@@ -462,11 +470,23 @@ const handleVerifyOtp = async () => {
 
     if (verifyError) throw verifyError
 
-    const url = await stripeService.getManageSubscriptionUrl()
-    if (url) window.location.href = url
-    else throw new Error('Could not open subscription management.')
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) user.value = session.user
+
+    // Always show pricing after login; no redirect to Stripe until user selects a plan and clicks checkout
+    selectedPackageId.value = null
+    selectedPackage.value = null
+    authError.value = null
+    otpSent.value = false
   } catch (err) {
-    authError.value = err.message || 'Invalid code or failed to open management. Try again.'
+    if (user.value) {
+      selectedPackageId.value = null
+      selectedPackage.value = null
+      authError.value = null
+      otpSent.value = false
+    } else {
+      authError.value = err.message || 'Invalid code or failed to sign in. Try again.'
+    }
     console.error('Verify OTP error:', err)
   } finally {
     verifying.value = false
@@ -496,14 +516,16 @@ const processPurchase = async () => {
     if (sessionError || !session) {
       throw new Error('Session expired. Please sign in again.')
     }
-    
-    // Create checkout session and redirect to Stripe
+
+    // Always go to Stripe Checkout (payment page) when they chose a plan and clicked the button
+    // Create checkout session and redirect (back/cancel returns to register)
     await stripeService.purchaseSubscription(
       selectedPackage.value.priceId,
       selectedPackage.value.planType,
       user.value.id,
       'https://daily-breathing.com/welcome/',
-      `${window.location.origin}${window.location.pathname || '/'}?checkout=cancel`
+      'https://daily-breathing.com/register',
+      activePromo.value?.promotionCodeId || null
     )
     
     // Note: User will be redirected to Stripe Checkout, so we won't reach here
@@ -538,6 +560,16 @@ const getPackageDescription = (pkg) => {
 
 const formatPrice = (pkg) => {
   return pkg.formattedAmount || 'N/A'
+}
+
+const formatDiscountedPrice = (pkg) => {
+  if (!activePromo.value || !pkg.amount) return formatPrice(pkg)
+  const discounted = pkg.amount * (1 - activePromo.value.discountPercent / 100)
+  return new Intl.NumberFormat('de-DE', {
+    style: 'currency',
+    currency: pkg.currency || 'EUR',
+    minimumFractionDigits: 2
+  }).format(discounted / 100)
 }
 
 const formatTrialPrice = (pkg) => {
@@ -582,56 +614,62 @@ const calculateSavingsPercentage = () => {
 }
 
 onMounted(async () => {
-  // Check if user is already logged in
-  const { data: { session } } = await supabase.auth.getSession()
-  if (session?.user) {
-    user.value = session.user
-  }
+  try {
+    // Load offerings first so the UI can render even if auth is slow
+    await loadOfferings()
 
-  await loadOfferings()
-
-  // Set first package as default selection after packages are loaded
-  if (packages.value.length > 0) {
-    selectedPackageId.value = packages.value[0].identifier || packages.value[0].id
-    selectedPackage.value = packages.value[0]
-  }
-
-  // Listen for auth changes
-  supabase.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_IN' && session?.user) {
+    // Check if user is already logged in
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user) {
       user.value = session.user
-    } else if (event === 'SIGNED_OUT') {
-      user.value = null
     }
-  })
 
-  // Check for checkout success/cancel in URL params
-  const urlParams = new URLSearchParams(window.location.search)
-  if (urlParams.get('checkout') === 'success') {
-    // User returned from successful checkout
-    purchaseComplete.value = true
-    purchasing.value = false
-    
-    // Verify subscription status
-    try {
-      const subscriptionData = await stripeService.getCustomerSubscriptions()
-      if (subscriptionData?.hasStripeSubscription) {
-        console.log('✅ Subscription verified:', subscriptionData.subscription)
+    // Set first package as default selection after packages are loaded
+    if (packages.value.length > 0) {
+      selectedPackageId.value = packages.value[0].identifier || packages.value[0].id
+      selectedPackage.value = packages.value[0]
+    }
+
+    // Listen for auth changes
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        user.value = session.user
+      } else if (event === 'SIGNED_OUT') {
+        user.value = null
       }
-    } catch (err) {
-      console.error('Error verifying subscription:', err)
-      // Don't show error to user - they may have just completed checkout
+    })
+
+    // Check for checkout success/cancel in URL params
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('checkout') === 'success') {
+      // User returned from successful checkout
+      purchaseComplete.value = true
+      purchasing.value = false
+
+      // Verify subscription status
+      try {
+        const subscriptionData = await stripeService.getCustomerSubscriptions()
+        if (subscriptionData?.hasStripeSubscription) {
+          console.log('✅ Subscription verified:', subscriptionData.subscription)
+        }
+      } catch (err) {
+        console.error('Error verifying subscription:', err)
+      }
+    } else if (urlParams.get('checkout') === 'cancel') {
+      // User cancelled checkout – reset to plan selection so they can try again
+      purchasing.value = false
+      error.value = null
+      selectedPackageId.value = null
+      selectedPackage.value = null
+      if (window.history.replaceState) {
+        window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+      }
     }
-  } else if (urlParams.get('checkout') === 'cancel') {
-    // User cancelled checkout – reset to plan selection so they can try again
-    purchasing.value = false
-    error.value = null
-    selectedPackageId.value = null
-    selectedPackage.value = null
-    // Clear URL so refresh doesn't re-trigger
-    if (window.history.replaceState) {
-      window.history.replaceState({}, '', window.location.pathname + window.location.hash)
-    }
+  } catch (err) {
+    console.error('SubscriptionFlow onMounted error:', err)
+    error.value = err?.message || 'Something went wrong'
+  } finally {
+    loading.value = false
   }
 })
 </script>
@@ -642,6 +680,44 @@ onMounted(async () => {
   margin: 0 auto;
   font-family: "Poppins", sans-serif;
   letter-spacing: -0.03em;
+}
+
+.promo-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.promo-tag {
+  background: #F24301;
+  color: white;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.promo-text {
+  color: white;
+  font-size: 0.95rem;
+  opacity: 0.95;
+}
+
+.price-original {
+  text-decoration: line-through;
+  opacity: 0.55;
+  margin-right: 0.4rem;
+}
+
+.price-discounted {
+  font-weight: 700;
 }
 
 .packages-list {
@@ -776,27 +852,6 @@ onMounted(async () => {
   border-color: #F24301;
 }
 
-.otp-form .otp-input {
-  text-align: center;
-  letter-spacing: 0.5em;
-  font-size: 2.25rem;
-  font-weight: 600;
-  max-width: 14rem;
-  margin: 0 auto;
-  display: block;
-  background: transparent;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  color: white;
-}
-
-.otp-form .otp-input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.otp-form .otp-input:focus {
-  border-color: rgba(255, 255, 255, 0.9);
-  outline: none;
-}
 
 form {
   display: flex;
@@ -805,18 +860,48 @@ form {
   letter-spacing: -0.03em;
 }
 
-form button[type="submit"],
+/* Primary button: full width, capitals, orange */
+.btn-primary,
+form button[type="submit"].btn-primary,
 button.submit-btn {
-  background: #F24301;
-  color: white;
-  border-style: solid;
-  border-width: 1px 1px 1px 1px;
-  border-color: #FFFFFF4D;
-  border-radius: 6px;
+  width: 100%;
   padding: 1rem 1.5rem;
-  cursor: pointer;
   font-size: 1.4rem;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #F24301;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover:not(:disabled),
+form button[type="submit"].btn-primary:hover:not(:disabled) {
+  background: #d63900;
+}
+
+/* Secondary button: full width, capitals, outline */
+.btn-secondary {
+  width: 100%;
+  padding: 1rem 1.5rem;
+  font-size: 1.4rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: transparent;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.9);
 }
 
 .link-button {
@@ -827,6 +912,10 @@ button.submit-btn {
   text-decoration: underline;
   cursor: pointer;
   font: inherit;
+}
+
+.login-btn {
+  display: none;
 }
 
 .terms-text {
@@ -846,6 +935,7 @@ button.submit-btn {
   opacity: 0.8;
 }
 
+.btn-primary:disabled,
 form button[type="submit"]:disabled,
 button.submit-btn:disabled {
   opacity: 0.6;
@@ -857,9 +947,28 @@ h2 {
   color: white;
 }
 
-.processing-message h2,
-.processing-message p {
+.processing-message {
+  text-align: center;
+}
+
+.processing-message h2 {
   color: white;
+}
+
+.processing-message .spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 1.5rem auto 0;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .ready-checkout {
@@ -871,8 +980,8 @@ h2 {
   color: white;
 }
 
-.ready-checkout .btn-retry {
-  display: inline-block;
+.ready-checkout .checkout-actions {
+  max-width: 100%;
 }
 
 .select-plan-block h2,
@@ -902,6 +1011,12 @@ h2 {
   border-radius: 6px;
   margin-bottom: 1rem;
   font-size: 0.875rem;
+}
+
+.success-message.otp-code-prompt {
+  color: white;
+  background: transparent;
+  font-size: 1.25rem;
 }
 
 .loading-skeleton {
@@ -948,48 +1063,14 @@ h2 {
   }
 }
 
-.btn-retry {
-  margin-top: 1rem;
-  padding: 0.75rem 1.5rem;
-  background: #F24301;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background 0.2s;
-}
-
-.btn-retry:hover {
-  background: #d63900;
-}
 
 .checkout-actions {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 1rem;
   margin-top: 1rem;
-}
-
-.checkout-actions .btn-retry {
-  margin-top: 0;
-}
-
-.btn-back-to-start {
-  background: none;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: background 0.2s, border-color 0.2s;
-}
-
-.btn-back-to-start:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.8);
+  width: 100%;
 }
 
 .logout-btn {
@@ -1004,6 +1085,7 @@ h2 {
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
+  display: none;
 }
 
 .logout-btn:hover {

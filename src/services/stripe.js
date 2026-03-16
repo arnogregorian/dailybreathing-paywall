@@ -45,16 +45,16 @@ class StripeService {
     }
   }
 
-  async createCheckoutSession(priceId, planType, userId, successUrl, cancelUrl) {
+  async createCheckoutSession(priceId, planType, userId, successUrl, cancelUrl, promotionCodeId) {
     try {
       // Ensure we have a valid session before calling the edge function
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
+
       if (sessionError) {
         console.error('Session error:', sessionError)
         throw new Error('Authentication error. Please sign in again.')
       }
-      
+
       if (!session) {
         console.error('No active session found')
         throw new Error('Please sign in to create a checkout session')
@@ -62,14 +62,20 @@ class StripeService {
 
       console.log('Calling edge function with session for user:', session.user.id)
 
+      const body = {
+        stripePriceId: priceId,
+        planType: planType,
+        userId: userId,
+        successUrl: successUrl || 'https://daily-breathing.com/welcome/',
+        cancelUrl: cancelUrl || 'https://daily-breathing.com/register'
+      }
+
+      if (promotionCodeId) {
+        body.promotionCodeId = promotionCodeId
+      }
+
       const { data, error } = await supabase.functions.invoke('create-stripe-checkout-session', {
-        body: {
-          stripePriceId: priceId,
-          planType: planType,
-          userId: userId,
-          successUrl: successUrl || 'https://daily-breathing.com/welcome/',
-          cancelUrl: cancelUrl || `${window.location.origin}${window.location.pathname || '/'}?checkout=cancel`
-        }
+        body
       })
 
       if (error) {
@@ -98,9 +104,9 @@ class StripeService {
     }
   }
 
-  async purchaseSubscription(priceId, planType, userId, successUrl, cancelUrl) {
+  async purchaseSubscription(priceId, planType, userId, successUrl, cancelUrl, promotionCodeId) {
     try {
-      const session = await this.createCheckoutSession(priceId, planType, userId, successUrl, cancelUrl)
+      const session = await this.createCheckoutSession(priceId, planType, userId, successUrl, cancelUrl, promotionCodeId)
       await this.redirectToCheckout(session.checkoutUrl)
     } catch (error) {
       console.error('Purchase failed:', error)
@@ -137,11 +143,13 @@ class StripeService {
 
   async getManageSubscriptionUrl() {
     try {
+      // Edge function must use this returnUrl for the portal session so "Back" goes to register
+      const returnUrl = 'https://daily-breathing.com/register'
       const { data, error } = await supabase.functions.invoke('create-stripe-portal-session', {
-        body: {}
+        body: { returnUrl }
       })
       if (error) throw error
-      return data?.url
+      return data
     } catch (error) {
       console.error('Failed to get portal URL:', error)
       throw error
